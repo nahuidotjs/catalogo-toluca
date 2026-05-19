@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Visualizador de Capas · Toluca ZMV</title>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+
+  <!-- Leaflet plugins -->
+  <!-- toGeoJSON: convierte KML → GeoJSON en el browser -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/togeojson/0.16.0/togeojson.min.js"></script>
+  <!-- Leaflet.markercluster -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Source+Sans+3:wght@300;400;600&display=swap" rel="stylesheet"/>
+
+  <style>
+    /* ── VARIABLES ──────────────────────────────────────────── */
+    :root {
+      --blue:       #1a6bb5;
+      --blue-dark:  #0d4a82;
+      --blue-light: #e8f2fc;
+      --blue-mid:   #2d85d0;
+      --accent:     #e8521a;
+      --bg:         #f4f6fa;
+      --surface:    #ffffff;
+      --border:     #dde3ec;
+      --text:       #1c2333;
+      --text-muted: #6b7a99;
+      --panel-w:    300px;
+      --header-h:   52px;
+      --font-body:  'Source Sans 3', system-ui, sans-serif;
+      --font-disp:  'Playfair Display', Georgia, serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin:0; padding:0; }
+    html, body { height:100%; overflow:hidden; font-family: var(--font-body); color: var(--text); }
+
+    /* ── HEADER ─────────────────────────────────────────────── */
+    .header {
+      position: fixed; top:0; left:0; right:0; height: var(--header-h);
+      background: var(--blue-dark);
+      display: flex; align-items: center; gap:14px;
+      padding: 0 18px;
+      z-index: 1000;
+      box-shadow: 0 2px 8px rgba(0,0,0,.25);
+    }
+    .header-logo { font-size:1.3rem; }
+    .header-title {
+      font-family: var(--font-disp);
+      font-size: 1rem;
+      color: #fff;
+      line-height: 1.2;
+    }
+    .header-sub { font-size:0.72rem; color: rgba(255,255,255,.65); font-family: var(--font-body); font-weight:300; }
+    .header-spacer { flex:1; }
+    .header-btn {
+      display: flex; align-items: center; gap:6px;
+      padding: 6px 14px;
+      background: rgba(255,255,255,.12);
+      border: 1px solid rgba(255,255,255,.2);
+      border-radius: 6px;
+      color:#fff; font-size:0.8rem; font-weight:600;
+      cursor:pointer; text-decoration:none;
+      transition: background .18s;
+    }
+    .header-btn:hover { background: rgba(255,255,255,.22); }
+
+    /* ── PANEL LATERAL ──────────────────────────────────────── */
+    .panel {
+      position: fixed;
+      top: var(--header-h); left:0; bottom:0;
+      width: var(--panel-w);
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      z-index: 900;
+      transition: transform .3s;
+    }
+    .panel.collapsed { transform: translateX(calc(-1 * var(--panel-w))); }
+
+    .panel-header {
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid var(--border);
+      display:flex; align-items:center; justify-content:space-between;
+    }
+    .panel-header h2 {
+      font-size:0.82rem; font-weight:700;
+      text-transform:uppercase; letter-spacing:.06em;
+      color: var(--blue);
+    }
+    .panel-toggle-btn {
+      background:none; border:none; cursor:pointer;
+      color: var(--text-muted); font-size:1rem;
+      padding:2px 4px; border-radius:4px;
+      transition: color .15s;
+    }
+    .panel-toggle-btn:hover { color: var(--blue); }
+
+    /* Buscador de capa */
+    .panel-search {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .panel-search input {
+      width:100%; padding:7px 10px;
+      border:1px solid var(--border); border-radius:6px;
+      font-size:0.82rem; font-family:inherit;
+      background: var(--bg);
+      transition: border-color .18s;
+    }
+    .panel-search input:focus { outline:none; border-color: var(--blue-mid); }
+
+    /* Grupos de capas */
+    .layers-scroll {
+      flex:1; overflow-y:auto;
+      padding-bottom:16px;
+    }
+    .layer-group { border-bottom: 1px solid var(--border); }
+    .group-header {
+      display:flex; align-items:center; gap:8px;
+      padding:10px 14px;
+      cursor:pointer;
+      font-size:0.82rem; font-weight:600;
+      color: var(--text);
+      user-select:none;
+      transition: background .15s;
+    }
+    .group-header:hover { background: var(--blue-light); }
+    .group-arrow {
+      font-size:0.65rem; color:var(--text-muted);
+      transition: transform .2s;
+      margin-left:auto;
+    }
+    .group-header.open .group-arrow { transform: rotate(90deg); }
+    .group-icon { font-size:1rem; }
+
+    .group-items { display:none; }
+    .group-items.open { display:block; }
+
+    .layer-item {
+      display:flex; align-items:center; gap:8px;
+      padding: 7px 14px 7px 30px;
+      font-size:0.8rem;
+      border-bottom: 1px solid #f0f2f6;
+      transition: background .12s;
+      cursor:pointer;
+    }
+    .layer-item:hover { background: var(--blue-light); }
+    .layer-item.loading { opacity:.6; }
+    .layer-item.loaded  { }
+
+    /* checkbox custom */
+    .layer-cb { display:none; }
+    .layer-check {
+      width:16px; height:16px; min-width:16px;
+      border:2px solid var(--border); border-radius:3px;
+      display:flex; align-items:center; justify-content:center;
+      transition: all .15s;
+      background:#fff;
+    }
+    .layer-cb:checked + .layer-check {
+      background: var(--blue); border-color: var(--blue);
+    }
+    .layer-cb:checked + .layer-check::after {
+      content:'✓'; font-size:0.65rem; color:#fff; font-weight:700;
+    }
+    .layer-name { flex:1; line-height:1.3; }
+    .layer-status {
+      font-size:0.65rem; padding:1px 5px; border-radius:3px;
+      font-weight:600; letter-spacing:.04em;
+    }
+    .layer-status.ok  { background:#d4edda; color:#155724; }
+    .layer-status.err { background:#f8d7da; color:#721c24; }
+    .layer-status.spin { color:var(--text-muted); animation: spin .8s linear infinite; display:inline-block; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+
+    /* swatch color de capa */
+    .layer-swatch {
+      width:10px; height:10px; border-radius:2px; min-width:10px;
+    }
+
+    /* Basemaps */
+    .basemap-section {
+      padding: 12px 14px;
+      border-top: 1px solid var(--border);
+    }
+    .basemap-label {
+      font-size:0.72rem; font-weight:700; text-transform:uppercase;
+      letter-spacing:.06em; color:var(--text-muted); margin-bottom:8px;
+    }
+    .basemap-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+    .basemap-opt {
+      border:2px solid transparent; border-radius:6px; overflow:hidden;
+      cursor:pointer; position:relative;
+      transition: border-color .18s;
+    }
+    .basemap-opt.active { border-color: var(--blue); }
+    .basemap-opt img { width:100%; aspect-ratio:1; object-fit:cover; display:block; }
+    .basemap-opt span {
+      display:block; font-size:0.6rem; text-align:center;
+      padding:2px 0; background:#fff; color:var(--text-muted);
+    }
+
+    /* ── MAPA ───────────────────────────────────────────────── */
+    #map {
+      position: fixed;
+      top: var(--header-h);
+      left: var(--panel-w);
+      right: 0; bottom: 0;
+      transition: left .3s;
+      z-index: 1;
+    }
+    body.panel-hidden #map { left:0; }
+
+    /* botón para colapsar panel desde el mapa */
+    .map-panel-toggle {
+      position: absolute;
+      top: 12px; left: 12px;
+      z-index: 800;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius:6px; padding:6px 10px;
+      cursor:pointer; font-size:0.85rem;
+      box-shadow: 0 2px 6px rgba(0,0,0,.12);
+      display:none;
+    }
+    body.panel-hidden .map-panel-toggle { display:block; }
+
+    /* ── TOOLTIP CAPA EN MAPA ───────────────────────────────── */
+    .leaflet-popup-content-wrapper { border-radius:8px; font-family:var(--font-body); }
+
+    /* ── NOTIFICACIÓN ───────────────────────────────────────── */
+    .toast {
+      position:fixed; bottom:24px; right:24px; z-index:2000;
+      background:var(--text); color:#fff;
+      padding:10px 18px; border-radius:8px; font-size:0.82rem;
+      box-shadow:0 4px 16px rgba(0,0,0,.25);
+      animation: toastIn .25s, toastOut .3s 2.5s forwards;
+      pointer-events:none;
+    }
+    @keyframes toastIn  { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
+    @keyframes toastOut { to{opacity:0;transform:translateY(10px)} }
+
+    /* ── INFO BOX CORS ──────────────────────────────────────── */
+    .cors-notice {
+      background: #fff8e1; border:1px solid #ffe082;
+      border-radius:8px; padding:12px 14px; margin:10px 14px;
+      font-size:0.78rem; color:#5d4037; line-height:1.5;
+    }
+    .cors-notice strong { color:#bf360c; }
+
+    /* ── RESPONSIVE ─────────────────────────────────────────── */
+    @media(max-width:700px){
+      :root { --panel-w:260px; }
+      .header-title { font-size:0.85rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header class="header">
+    <span class="header-logo">🗺</span>
+    <div>
+      <div class="header-title">Visualizador Geográfico</div>
+      <div class="header-sub">Zona Metropolitana del Valle de Toluca</div>
+    </div>
+    <div class="header-spacer"></div>
+    <a href="index.html" class="header-btn">☰ Catálogo</a>
+  </header>
+
+  <!-- PANEL LATERAL -->
+  <aside class="panel" id="panel">
+    <div class="panel-header">
+      <h2>Capas</h2>
+      <button class="panel-toggle-btn" id="panel-collapse-btn" title="Colapsar panel">◀</button>
+    </div>
+
+    <div class="panel-search">
+      <input type="text" id="layer-search" placeholder="🔍 Buscar capa…"/>
+    </div>
+
+    <div class="cors-notice">
+      <strong>⚠ Nota sobre Drive:</strong> Los archivos de Google Drive tienen restricción CORS. 
+      Las capas se cargan vía proxy público. Si falla, descarga el KML y ábrelo localmente.
+    </div>
+
+    <!-- Grupos generados por JS -->
+    <div class="layers-scroll" id="layers-list"></div>
+
+    <!-- Mapas base -->
+    <div class="basemap-section">
+      <div class="basemap-label">Mapa base</div>
+      <div class="basemap-grid" id="basemap-grid"></div>
+    </div>
+  </aside>
+
+  <!-- Botón flotante para mostrar panel -->
+  <button class="map-panel-toggle" id="show-panel-btn" onclick="showPanel()">☰ Capas</button>
+
+  <!-- MAPA -->
+  <div id="map"></div>
+
+  <script>
+  /* ══════════════════════════════════════════════════════════
+     CONFIGURACIÓN DE CAPAS
+     Edita aquí para agregar/quitar capas.
+     driveId: ID de Google Drive del archivo KML
+  ══════════════════════════════════════════════════════════ */
+  const GRUPOS = [
+    {
+      nombre: "Límites y Contornos",
+      icon: "🗂",
+      capas: [
+        { id:"delegaciones",       nombre:"Delegaciones",            driveId:"18L_CgtW-o8VmbBVZ7rW4yIC8ziTWFUMS", color:"#1a6bb5" },
+        { id:"zmvt-contorno",      nombre:"ZMVT Contorno",           driveId:"1lERjzNkjl8SNIa1xDE23u20w45-fDcQ3", color:"#0d4a82" },
+        { id:"poligono-contorno",  nombre:"Polígono Contorno",       driveId:"1USz5Ll5nhTAaWU8Sgm6ouAY6ZMNo8stT", color:"#2d85d0" },
+        { id:"toluca",             nombre:"Toluca",                  driveId:"1n-Dn7IgCRI8ZsTri5xo9b7M0qnO6J38t", color:"#5ba3d9" },
+        { id:"zmvt",               nombre:"ZMVT",                    driveId:"1ode4RsSdS4D44lS7U_o8wRTEtkOl-9Yc", color:"#1a6bb5" },
+        { id:"toluca-manzanas",    nombre:"Toluca Manzanas",         driveId:"1GnGhVqLAKgUKw6q0UzT12a0CdqLkvF2l", color:"#7fbce8" },
+        { id:"metropolis-2020",    nombre:"Metrópolis 2020",         driveId:"1NxxTEJUEyWMI3vNzt_D2bEnyibtLlaus", color:"#1a6bb5" },
+        { id:"edomex-igecem",      nombre:"EdoMex IGECEM",           driveId:"1WFg3Q0xTCzf6ff8dqqxqbuMWER_1GrU7", color:"#3d8bcd" },
+      ]
+    },
+    {
+      nombre: "Transporte Público",
+      icon: "🚌",
+      capas: [
+        { id:"rutas-toluca",       nombre:"Rutas de Toluca",         driveId:"1-lR1RLk1xjUQS099g81ahYz2xzjNUJ-4", color:"#e8521a" },
+        { id:"cableus",            nombre:"Cableús Líneas",          driveId:"1n5DaIvhAxyAMt86XLcnwZXr5xG7YxvDq", color:"#c0392b" },
+        { id:"tren-interurbano",   nombre:"Tren Interurbano",        driveId:"1TxlxahLt5RKM_W86RqMyyAwvvLRua8pz", color:"#8e44ad" },
+        { id:"rutas-toluca-main",  nombre:"Rutas Toluca (Ppal)",     driveId:"1lvUIrPhAkVWDCy45a1PMqAjPRAIOmXdL", color:"#e67e22" },
+        { id:"terminal-completo",  nombre:"Terminal Toluca (Rutas)", driveId:"1Yut7c9Gdfk4tMvs_ybkkyVs-1Zi35HCT", color:"#d35400" },
+        { id:"cetram-rutas",       nombre:"CETRAM Rutas",            driveId:"1l14vL1AXLX0gIGN1NudBp4_K7mtESvq-", color:"#e74c3c" },
+        { id:"rutas-uber",         nombre:"Rutas Uber",              driveId:"1Qf7HvaYZJaygaiEfC9LgQItZx-U5QalQ", color:"#1abc9c" },
+      ]
+    },
+    {
+      nombre: "Rutas Reales",
+      icon: "🛣",
+      capas: [
+        { id:"rutas-reales-toluca",     nombre:"Rutas Reales Toluca",       driveId:"1gg14q_yy0khlFEjdxx6f8Zu25qW11kJM", color:"#27ae60" },
+        { id:"rutas-reales-lerma",      nombre:"Rutas Reales Lerma",        driveId:"14NyoCr4N1ihRYQgo4cbTNY-ii4ZVl8Oi", color:"#2ecc71" },
+        { id:"rutas-reales-zinac",      nombre:"Rutas Reales Zinacantepec", driveId:"1Z5R1gkR0Iu_Rmg7_bawiuE1-3AaV_4F0", color:"#16a085" },
+      ]
+    },
+    {
+      nombre: "Vialidades",
+      icon: "🛤",
+      capas: [
+        { id:"vias-toluca-igecem",  nombre:"Vías Toluca IGECEM",     driveId:"1tF1KnocM_5R48w5S8iPFLqGWQ7ffkFNZ", color:"#7f8c8d" },
+        { id:"vias-toluca",         nombre:"Vías Toluca",            driveId:"1l8hImfx0sdRwjStPhYsMT9qVBg49W6Sj", color:"#95a5a6" },
+        { id:"diagnostico",         nombre:"Diagnóstico",            driveId:"1kg_kEJ9tLWLwVyClAcKt_Ti8wO2s4bYn", color:"#bdc3c7" },
+      ]
+    },
+    {
+      nombre: "Intersecciones",
+      icon: "🔀",
+      capas: [
+        { id:"intersec-toluca",     nombre:"Intersecciones Toluca",        driveId:"17HMAnPyTSRLdPNuaMf9vd_FwESHlDMGj", color:"#f39c12" },
+        { id:"intersec-lerma",      nombre:"Intersecciones Lerma",         driveId:"1H16Kvl1fRiE2cAD95yXCxTPMVquvc6PX", color:"#e67e22" },
+        { id:"intersec-zinac",      nombre:"Intersecciones Zinacantepec",  driveId:"10u5tpWy4JRk5OY-oMxrHy647-l4uhuPL", color:"#f1c40f" },
+        { id:"intersec-concesion",  nombre:"Intersecciones Concesionarios",driveId:"1YWv7L-usHC3UVQqTk-qV1cjwo6Be5eVm", color:"#d4ac0d" },
+        { id:"intersecciones",      nombre:"Intersecciones (general)",     driveId:"1bVRVTFsSSFamZlHOf11y1lI7v09RUiM3", color:"#f0b429" },
+      ]
+    },
+    {
+      nombre: "Localidades Recorridas",
+      icon: "📍",
+      capas: [
+        { id:"localidades-1",  nombre:"Localidades Recorridas 1", driveId:"1V38fEnYaEAU5mytKL3mWxhLp91S4GHMy", color:"#9b59b6" },
+        { id:"localidades-2",  nombre:"Localidades Recorridas 2", driveId:"1g9By9xChQRZ-IQK-g5pW51Dele4CPbnK", color:"#8e44ad" },
+        { id:"localidades-3",  nombre:"Localidades Recorridas 3", driveId:"1ojgMERMrOwJCrvEmXOf1wOm1PmNx1vK0", color:"#6c3483" },
+        { id:"localidades-4",  nombre:"Localidades Recorridas 4", driveId:"1-2uAEbv1faM-LBZcM3dRd2EERQFk7x9S", color:"#a569bd" },
+        { id:"localidades-5",  nombre:"Localidades Recorridas 5", driveId:"1M4Co8cBsSuKLcZg0TPZ0U1s-g3e7FeCw", color:"#bb8fce" },
+        { id:"localidades-6",  nombre:"Localidades Recorridas 6", driveId:"1qAasKaIfZ2Kv0AzU6OZxahHC7cMjgBph", color:"#7d3c98" },
+        { id:"localidades-r",  nombre:"Localidades Recorridas",   driveId:"1iwfX6WW6f1W0tVMNVOngp5WdkZRB6Aw0", color:"#af7ac5" },
+      ]
+    }
+  ];
+
+  /* ══════════════════════════════════════════════════════════
+     PROXIES CORS para Google Drive
+     Se prueban en orden hasta que uno funcione
+  ══════════════════════════════════════════════════════════ */
+  const CORS_PROXIES = [
+    id => `https://corsproxy.io/?url=${encodeURIComponent(`https://drive.google.com/uc?export=download&id=${id}`)}`,
+    id => `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://drive.google.com/uc?export=download&id=${id}`)}`,
+    id => `https://cors-anywhere.herokuapp.com/https://drive.google.com/uc?export=download&id=${id}`,
+  ];
+
+  /* ══════════════════════════════════════════════════════════
+     MAPA BASE
+  ══════════════════════════════════════════════════════════ */
+  const BASEMAPS = [
+    { id:"osm",    label:"OSM",      url:"https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", attr:"© OpenStreetMap", thumb:"https://tile.openstreetmap.org/10/280/410.png" },
+    { id:"light",  label:"Claro",    url:"https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", attr:"© CartoDB", thumb:"https://a.basemaps.cartocdn.com/light_all/10/280/410.png" },
+    { id:"dark",   label:"Oscuro",   url:"https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",  attr:"© CartoDB", thumb:"https://a.basemaps.cartocdn.com/dark_all/10/280/410.png" },
+    { id:"sat",    label:"Satélite", url:"https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", attr:"© Esri", thumb:"https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/10/410/280" },
+  ];
+
+  /* ══════════════════════════════════════════════════════════
+     INIT MAPA
+  ══════════════════════════════════════════════════════════ */
+  const map = L.map('map', {
+    center: [19.28, -99.66],
+    zoom: 11,
+    zoomControl: false
+  });
+
+  L.control.zoom({ position:'bottomright' }).addTo(map);
+
+  let currentBasemap = null;
+  function setBasemap(id) {
+    const bm = BASEMAPS.find(b => b.id === id);
+    if (!bm) return;
+    if (currentBasemap) map.removeLayer(currentBasemap);
+    currentBasemap = L.tileLayer(bm.url, { attribution: bm.attr, maxZoom:19 }).addTo(map);
+    document.querySelectorAll('.basemap-opt').forEach(el => el.classList.toggle('active', el.dataset.id === id));
+  }
+  setBasemap('light');
+
+  /* Basemap grid */
+  const bmGrid = document.getElementById('basemap-grid');
+  BASEMAPS.forEach(bm => {
+    const div = document.createElement('div');
+    div.className = 'basemap-opt' + (bm.id === 'light' ? ' active' : '');
+    div.dataset.id = bm.id;
+    div.innerHTML = `<img src="${bm.thumb}" alt="${bm.label}" loading="lazy"/><span>${bm.label}</span>`;
+    div.onclick = () => setBasemap(bm.id);
+    bmGrid.appendChild(div);
+  });
+
+  /* ══════════════════════════════════════════════════════════
+     CAPAS ACTIVAS
+  ══════════════════════════════════════════════════════════ */
+  const activeLayers = {};   // id → L.layerGroup
+  const loadCache    = {};   // id → 'loading'|'loaded'|'error'
+
+  /* Estilo por defecto según color de capa */
+  function layerStyle(color) {
+    return {
+      color,
+      weight: 2,
+      opacity: 0.85,
+      fillColor: color,
+      fillOpacity: 0.18
+    };
+  }
+
+  /* Estilo para puntos */
+  function pointToLayer(color, feature, latlng) {
+    return L.circleMarker(latlng, {
+      radius: 6,
+      fillColor: color,
+      color: '#fff',
+      weight: 1.5,
+      opacity: 1,
+      fillOpacity: 0.85
+    });
+  }
+
+  /* Intentar cargar KML desde Drive con proxies */
+  async function fetchKML(driveId) {
+    let lastErr;
+    for (const proxyFn of CORS_PROXIES) {
+      try {
+        const url = proxyFn(driveId);
+        const resp = await fetch(url, { signal: AbortSignal.timeout(12000) });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const text = await resp.text();
+        if (!text.includes('<kml') && !text.includes('<KML')) throw new Error('No es KML válido');
+        return text;
+      } catch(e) {
+        lastErr = e;
+      }
+    }
+    throw lastErr;
+  }
+
+  async function toggleLayer(capaObj, checkbox) {
+    const { id, driveId, color, nombre } = capaObj;
+    const item = document.querySelector(`.layer-item[data-id="${id}"]`);
+
+    if (activeLayers[id]) {
+      // Ya activa → desactivar
+      map.removeLayer(activeLayers[id]);
+      delete activeLayers[id];
+      return;
+    }
+
+    // Si ya hay datos en caché de error, no reintentar (para no spamear)
+    if (loadCache[id] === 'error') {
+      showToast(`⚠ "${nombre}" no pudo cargarse. Intenta descargarla.`);
+      checkbox.checked = false;
+      return;
+    }
+
+    // Marcar cargando
+    loadCache[id] = 'loading';
+    item.classList.add('loading');
+    setLayerStatus(id, 'spin', '↻');
+
+    try {
+      const kmlText = await fetchKML(driveId);
+      const parser  = new DOMParser();
+      const kmlDoc  = parser.parseFromString(kmlText, 'text/xml');
+      const geojson = toGeoJSON.kml(kmlDoc);
+
+      const layerGroup = L.featureGroup();
+      const geoLayer = L.geoJSON(geojson, {
+        style: () => layerStyle(color),
+        pointToLayer: (ft, ll) => pointToLayer(color, ft, ll),
+        onEachFeature: (feature, layer) => {
+          const props = feature.properties || {};
+          const name  = props.name || props.Name || nombre;
+          const desc  = props.description || '';
+          if (name) layer.bindPopup(`<b>${name}</b>${desc ? '<br/><small>'+desc.slice(0,200)+'</small>' : ''}`);
+        }
+      });
+
+      layerGroup.addLayer(geoLayer);
+      layerGroup.addTo(map);
+      activeLayers[id] = layerGroup;
+
+      loadCache[id] = 'loaded';
+      item.classList.remove('loading');
+      setLayerStatus(id, 'ok', '✓');
+
+      // Centrar si es la primera capa
+      if (Object.keys(activeLayers).length === 1) {
+        try { map.fitBounds(layerGroup.getBounds(), { padding:[30,30] }); } catch(_){}
+      }
+
+    } catch(err) {
+      console.error('[KML load error]', nombre, err);
+      loadCache[id] = 'error';
+      item.classList.remove('loading');
+      setLayerStatus(id, 'err', '✗');
+      checkbox.checked = false;
+      showToast(`✗ No se pudo cargar "${nombre}". Puede ser un problema de permisos de Drive.`);
+    }
+  }
+
+  function setLayerStatus(id, cls, text) {
+    const el = document.querySelector(`.layer-item[data-id="${id}"] .layer-status`);
+    if (!el) return;
+    el.className = `layer-status ${cls}`;
+    el.textContent = text;
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     CONSTRUIR PANEL DE CAPAS
+  ══════════════════════════════════════════════════════════ */
+  const layersList = document.getElementById('layers-list');
+
+  GRUPOS.forEach((grupo, gi) => {
+    const groupDiv = document.createElement('div');
+    groupDiv.className = 'layer-group';
+    groupDiv.dataset.group = gi;
+
+    const header = document.createElement('div');
+    header.className = 'group-header';
+    header.innerHTML = `<span class="group-icon">${grupo.icon}</span> ${grupo.nombre} <span class="group-arrow">▶</span>`;
+    header.onclick = () => {
+      const items = groupDiv.querySelector('.group-items');
+      const isOpen = items.classList.toggle('open');
+      header.classList.toggle('open', isOpen);
+    };
+
+    const itemsDiv = document.createElement('div');
+    itemsDiv.className = 'group-items';
+
+    grupo.capas.forEach(capa => {
+      const item = document.createElement('label');
+      item.className = 'layer-item';
+      item.dataset.id = capa.id;
+      item.dataset.nombre = capa.nombre.toLowerCase();
+
+      const cbId = 'cb-' + capa.id;
+      item.innerHTML = `
+        <input type="checkbox" class="layer-cb" id="${cbId}" data-id="${capa.id}"/>
+        <span class="layer-check"></span>
+        <span class="layer-swatch" style="background:${capa.color}"></span>
+        <span class="layer-name">${capa.nombre}</span>
+        <span class="layer-status"></span>`;
+
+      const cb = item.querySelector('.layer-cb');
+      cb.addEventListener('change', () => {
+        toggleLayer(capa, cb);
+      });
+
+      itemsDiv.appendChild(item);
+    });
+
+    groupDiv.appendChild(header);
+    groupDiv.appendChild(itemsDiv);
+    layersList.appendChild(groupDiv);
+  });
+
+  /* ══════════════════════════════════════════════════════════
+     BÚSQUEDA DE CAPAS
+  ══════════════════════════════════════════════════════════ */
+  document.getElementById('layer-search').addEventListener('input', function() {
+    const q = this.value.toLowerCase();
+    document.querySelectorAll('.layer-item').forEach(item => {
+      const match = !q || item.dataset.nombre.includes(q);
+      item.style.display = match ? '' : 'none';
+    });
+    // Abrir grupos con resultados
+    document.querySelectorAll('.layer-group').forEach(group => {
+      const visibles = group.querySelectorAll('.layer-item:not([style*="none"])');
+      if (q && visibles.length) {
+        group.querySelector('.group-items').classList.add('open');
+        group.querySelector('.group-header').classList.add('open');
+      }
+    });
+  });
+
+  /* ══════════════════════════════════════════════════════════
+     PANEL COLLAPSE
+  ══════════════════════════════════════════════════════════ */
+  document.getElementById('panel-collapse-btn').addEventListener('click', () => {
+    document.getElementById('panel').classList.add('collapsed');
+    document.body.classList.add('panel-hidden');
+    setTimeout(() => map.invalidateSize(), 320);
+  });
+  window.showPanel = function() {
+    document.getElementById('panel').classList.remove('collapsed');
+    document.body.classList.remove('panel-hidden');
+    setTimeout(() => map.invalidateSize(), 320);
+  };
+
+  /* ══════════════════════════════════════════════════════════
+     TOAST
+  ══════════════════════════════════════════════════════════ */
+  function showToast(msg) {
+    const t = document.createElement('div');
+    t.className = 'toast';
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 3000);
+  }
+  </script>
+</body>
+</html>

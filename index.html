@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Catálogo Geográfico · México</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Source+Sans+3:wght@300;400;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="css/style.css"/>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="header-brand">
+        <div class="brand-icon">🗺</div>
+        <div>
+          <h1 class="site-title">Catálogo de Datos Geográficos</h1>
+          <p class="site-subtitle">Capas KML · México</p>
+        </div>
+      </div>
+      <nav class="header-nav">
+        <a href="#catalogo">Catálogo</a>
+        <a href="mapa_viewer.html" style="background:var(--blue);color:#fff;padding:6px 14px;border-radius:6px;font-weight:600;">🗺 Visualizador</a>
+        <a href="#acerca">Acerca de</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-inner">
+      <span class="hero-badge">Datos Abiertos</span>
+      <h2 class="hero-title">Explora, descarga y visualiza<br/>datos geoespaciales de México</h2>
+      <p class="hero-desc">Colección de capas en formato KML organizadas por tema y escala, disponibles para su uso en Google Earth, QGIS y otras herramientas GIS.</p>
+
+      <!-- FILTROS -->
+      <div class="filter-bar">
+        <div class="filter-group">
+          <label>Escala</label>
+          <select id="filtro-escala">
+            <option value="">Todas las escalas</option>
+            <option value="estatal">Estatal</option>
+            <option value="municipal">Municipal</option>
+            <option value="localidad">Localidad</option>
+            <option value="nacional">Nacional</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Tema</label>
+          <select id="filtro-tema">
+            <option value="">Todos los temas</option>
+            <option value="limites">Límites y Contornos</option>
+            <option value="transporte">Transporte Público</option>
+            <option value="infraestructura">Vialidades e Intersecciones</option>
+            <option value="recorridos">Localidades Recorridas</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Fuente</label>
+          <select id="filtro-fuente">
+            <option value="">Todas las fuentes</option>
+            <option value="Propio">Propio</option>
+            <option value="INEGI">INEGI</option>
+            <option value="IGECEM">IGECEM</option>
+          </select>
+        </div>
+        <div class="filter-group search-group">
+          <label>Buscar</label>
+          <input type="text" id="filtro-busqueda" placeholder="Nombre del dataset…"/>
+        </div>
+      </div>
+
+      <!-- TOGGLE VISTA -->
+      <div class="view-toggle">
+        <button class="toggle-btn active" id="btn-grid" title="Vista cuadrícula">⊞</button>
+        <button class="toggle-btn" id="btn-list" title="Vista lista">☰</button>
+        <span class="result-count"><span id="count">0</span> capas encontradas</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- CATÁLOGO -->
+  <main class="catalog-main" id="catalogo">
+    <div class="catalog-container">
+
+      <!-- Las secciones se generan dinámicamente por JS -->
+      <div id="catalog-output"></div>
+
+      <!-- Estado vacío -->
+      <div class="empty-state" id="empty-state" style="display:none">
+        <span class="empty-icon">🔍</span>
+        <p>No se encontraron capas con esos filtros.</p>
+        <button onclick="resetFilters()">Limpiar filtros</button>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- MODAL DETALLE -->
+  <div class="modal-overlay" id="modal-overlay" onclick="closeModal()">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="closeModal()">✕</button>
+      <div id="modal-content"></div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="site-footer" id="acerca">
+    <div class="footer-inner">
+      <div class="footer-col">
+        <h3>Catálogo Geográfico</h3>
+        <p>Repositorio de capas KML de México mantenido en GitHub. Los datos provienen de fuentes oficiales como INEGI, CONABIO y SEMARNAT.</p>
+      </div>
+      <div class="footer-col">
+        <h3>Formatos</h3>
+        <ul>
+          <li>KML – Google Earth / Maps</li>
+          <li>SHP – QGIS / ArcGIS</li>
+          <li>GeoJSON – Leaflet / MapboxGL</li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h3>Recursos</h3>
+        <ul>
+          <li><a href="https://www.inegi.org.mx" target="_blank">INEGI</a></li>
+          <li><a href="https://www.conabio.gob.mx" target="_blank">CONABIO</a></li>
+          <li><a href="https://www.semarnat.gob.mx" target="_blank">SEMARNAT</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>Datos bajo licencia abierta · Sitio desplegado en <strong>GitHub Pages</strong></p>
+    </div>
+  </footer>
+
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
