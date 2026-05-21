@@ -1,0 +1,16 @@
+{
+  "groups": [],
+  "layers": [
+    {
+      "id": "l1779334367662gpt",
+      "groupId": "",
+      "name": "Rutas de Transporte concecionado",
+      "filename": "Rutas_de_Transporte_concecionado.kml",
+      "color": "#4f8ef7",
+      "visible": false,
+      "loaded": false
+    }
+  ],
+  "basemap": "light",
+  "updated": "2026-05-21T03:33:06.937Z"
+}
