@@ -9,8 +9,17 @@
       "color": "#4f8ef7",
       "visible": false,
       "loaded": false
+    },
+    {
+      "id": "l1779334463919iu7",
+      "groupId": "",
+      "name": "Toluca",
+      "filename": "Toluca.kml",
+      "color": "#38c9a0",
+      "visible": false,
+      "loaded": false
     }
   ],
   "basemap": "light",
-  "updated": "2026-05-21T03:34:01.011Z"
+  "updated": "2026-05-21T03:34:25.288Z"
 }
